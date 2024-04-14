@@ -3,6 +3,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { Construct } from 'constructs';
 import { HitCounter } from "./hitcounter";
+import { TableViewer } from 'cdk-dynamo-table-viewer';
 export class DoraemoCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -22,5 +23,9 @@ export class DoraemoCdkStack extends cdk.Stack {
       handler: helloWithCounter.handler,
     });
 
+    new TableViewer(this, 'ViewHitCounter', {
+      title: 'Hello Hits',
+      table: helloWithCounter.table;
+    });
   }
 }
