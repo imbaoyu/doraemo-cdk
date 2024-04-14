@@ -21,5 +21,9 @@ export class HitCounter extends Construct {
                 HITS_TABLE_NAME: table.tableName
             }
         });
+        // grant the lambda role read/write permission to DDB table
+        table.grantReadWriteData(this.handler);
+        // grant the lambda role invoke permissions to the downstream function
+        props.downstream.grantInvoke(this.handler);
     }
 }
