@@ -5,6 +5,7 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { Construct } from 'constructs';
 import { HitCounter } from "./hitcounter";
 import { TableViewer } from 'cdk-dynamo-table-viewer';
+import {DoraemoApiServer} from "./doraemo-api-server";
 export class DoraemoCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -26,7 +27,16 @@ export class DoraemoCdkStack extends cdk.Stack {
 
     new TableViewer(this, 'ViewHitCounter', {
       title: 'Hello Hits',
-      table: helloWithCounter.table;
+      table: helloWithCounter.table,
+    });
+
+    // Handles user request
+    const apiServer: DoraemoApiServer = new DoraemoApiServer(this, 'doramoApiServer', {
+      name: 'test'
+    })
+
+    new apigateway.LambdaRestApi(this, 'UserEndPoint',{
+      handler: apiServer.handler
     });
 =======
 import { Duration, Stack, StackProps } from 'aws-cdk-lib';
