@@ -4,7 +4,9 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { Construct } from 'constructs';
 import { HitCounter } from "./hitcounter";
 import { TableViewer } from 'cdk-dynamo-table-viewer';
-import {DoraemoApiServer} from "./doraemo-api-server";
+import { DoraemoApiServer } from "./doraemo-api-server";
+import { CognitoUserPool } from './congito-user-pool';
+
 export class DoraemoCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -25,17 +27,26 @@ export class DoraemoCdkStack extends cdk.Stack {
     });
 
     new TableViewer(this, 'ViewHitCounter', {
-      title: 'Hello Hits',
+      title: 'HelloHits',
       table: helloWithCounter.table,
     });
 
-    // Handles user request
-    const apiServer: DoraemoApiServer = new DoraemoApiServer(this, 'doramoApiServer', {
-      name: 'test'
-    })
+    // Main components of Doraemo
+    const cognitoUserPool = new CognitoUserPool(this, 'CognitoUserPool', {
+      name: 'MainUserPool',
+      apiUrl: 'https://example.com'
+    });
 
-    new apigateway.LambdaRestApi(this, 'UserEndPoint',{
-      handler: apiServer.handler
+    const apiServer: DoraemoApiServer = new DoraemoApiServer(this, 'DoramoApiServer', {
+      name: 'ApiServer',
+      userPool: cognitoUserPool.userPool,
+      userPoolClient: cognitoUserPool.userPoolClient,
+      cognitoUserPool: cognitoUserPool,
+    });
+
+    // Add all GET endpoints to allowed URLs
+    apiServer.getEndpoints.forEach(endpoint => {
+      cognitoUserPool.addAllowedUrl(`${apiServer.url}${endpoint}`);
     });
   }
 }
