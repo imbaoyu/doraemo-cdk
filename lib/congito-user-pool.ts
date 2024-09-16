@@ -35,8 +35,8 @@ export class CognitoUserPool extends Construct {
         });
 
         // Create a User Pool Client
-        this.callbackUrls = ['https://example.com'];
-        this.logoutUrls = ['https://example.com'];
+        this.callbackUrls = ['https://example.com', 'http://localhost:3000'];
+        this.logoutUrls = ['https://example.com', 'http://localhost:3000'];
 
         this.userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
             userPool: this.userPool,
@@ -45,6 +45,7 @@ export class CognitoUserPool extends Construct {
             oAuth: {
                 flows: {
                     authorizationCodeGrant: true,
+                    implicitCodeGrant: true,
                 },
                 scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
                 callbackUrls: this.callbackUrls,
@@ -80,8 +81,8 @@ export class CognitoUserPool extends Construct {
             },
         });
 
-        // Construct the full login URL
-        const loginUrl = `${domain.baseUrl()}/login?client_id=${this.userPoolClient.userPoolClientId}&response_type=code&redirect_uri=${encodeURIComponent(props.apiUrl + '/doraemo')}`;
+        // Modify the login URL construction
+        const loginUrl = `${domain.baseUrl()}/login?client_id=${this.userPoolClient.userPoolClientId}&response_type=token&scope=${encodeURIComponent('openid email profile')}&redirect_uri=${encodeURIComponent(props.apiUrl + '/doraemo')}`;
 
         // Output the full Hosted UI login URL
         new cdk.CfnOutput(this, 'HostedUILoginURL', {

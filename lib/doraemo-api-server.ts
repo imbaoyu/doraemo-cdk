@@ -34,7 +34,15 @@ export class DoraemoApiServer extends Construct {
         this.handler = new lambda.Function(this, 'ApiHandler', {
             runtime: lambda.Runtime.PYTHON_3_12,
             handler: 'doraemo-api-lambda.lambda_handler',
-            code: lambda.Code.fromAsset('../doraemo/lambda/python'),
+            code: lambda.Code.fromAsset('../doraemo/lambda/python', {
+                bundling: {
+                    image: lambda.Runtime.PYTHON_3_12.bundlingImage,
+                    command: [
+                        'bash', '-c',
+                        'pip install -r requirements.txt -t /asset-output && cp -au . /asset-output'
+                    ],
+                }
+            }),
             environment: {
                 USER_TABLE_NAME: this.table.tableName,
                 PROPS_NAME: props.name

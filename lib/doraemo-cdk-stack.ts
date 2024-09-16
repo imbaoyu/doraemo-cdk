@@ -5,6 +5,7 @@ import { Construct } from 'constructs';
 import { HitCounter } from "./hitcounter";
 import { TableViewer } from 'cdk-dynamo-table-viewer';
 import { DoraemoApiServer } from "./doraemo-api-server";
+import { DoraemoCrawler } from "./doraemo-crawler";
 import { CognitoUserPool } from './congito-user-pool';
 
 export class DoraemoCdkStack extends cdk.Stack {
@@ -47,6 +48,10 @@ export class DoraemoCdkStack extends cdk.Stack {
     // Add all GET endpoints to allowed URLs
     apiServer.getEndpoints.forEach(endpoint => {
       cognitoUserPool.addAllowedUrl(`${apiServer.url}${endpoint}`);
+    });
+
+    new DoraemoCrawler(this, 'DoraemoCrawler', {
+      name: 'DoraemoCrawler',
     });
   }
 }
