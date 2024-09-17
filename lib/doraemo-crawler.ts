@@ -30,7 +30,7 @@ export class DoraemoCrawler extends Construct {
                     image: lambda.Runtime.PYTHON_3_12.bundlingImage,
                     command: [
                         'bash', '-c',
-                        'pip install -r requirements.txt -t /asset-output && cp -au . /asset-output'
+                        'pip install --platform manylinux2014_x86_64 --only-binary=:all: -r requirements.txt -t /asset-output && cp -au . /asset-output'
                     ],
                 }
             }),
