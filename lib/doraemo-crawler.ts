@@ -25,7 +25,7 @@ export class DoraemoCrawler extends Construct {
         this.handler = new lambda.Function(this, 'CrawlerHandler', {
             runtime: lambda.Runtime.PYTHON_3_12,
             handler: 'doraemo-crawler-lambda.lambda_handler',
-            code: lambda.Code.fromAsset('../doraemo/lambda/python', {
+            code: lambda.Code.fromAsset('../doraemo-web/doraemo-web-lambda/python', {
                 bundling: {
                     image: lambda.Runtime.PYTHON_3_12.bundlingImage,
                     command: [

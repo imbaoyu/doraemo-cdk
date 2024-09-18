@@ -34,7 +34,7 @@ export class DoraemoApiServer extends Construct {
         this.handler = new lambda.Function(this, 'ApiHandler', {
             runtime: lambda.Runtime.PYTHON_3_12,
             handler: 'doraemo-api-lambda.lambda_handler',
-            code: lambda.Code.fromAsset('../doraemo/lambda/python', {
+            code: lambda.Code.fromAsset('../doraemo-web/doraemo-web-lambda/python', {
                 bundling: {
                     image: lambda.Runtime.PYTHON_3_12.bundlingImage,
                     command: [
