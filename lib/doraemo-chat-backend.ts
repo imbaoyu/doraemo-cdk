@@ -3,28 +3,28 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
 import * as cdk from 'aws-cdk-lib';
 
-export interface DoraemoCrawlerProps {
+export interface DoraemoChatProps {
     name: string;
 }
 
-export class DoraemoCrawler extends Construct {
+export class DoraemoChatStack extends Construct {
     public readonly handler: lambda.Function;
     public readonly table: dynamodb.Table;
     public readonly url: string;
     public readonly getEndpoints: string[];
 
-    constructor(scope: Construct, id: string, props: DoraemoCrawlerProps) {
+    constructor(scope: Construct, id: string, props: DoraemoChatProps) {
         super(scope, id);
 
         // Create DynamoDB table
-        this.table = new dynamodb.Table(this, 'CrawlerTable', {
+        this.table = new dynamodb.Table(this, 'ConversationHistoryTable', {
             partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING }
         });
 
         // Create Lambda function
-        this.handler = new lambda.Function(this, 'CrawlerHandler', {
+        this.handler = new lambda.Function(this, 'DoraemoChatHandler', {
             runtime: lambda.Runtime.PYTHON_3_12,
-            handler: 'doraemo-crawler-lambda.lambda_handler',
+            handler: 'doraemo-bot-lambda.lambda_handler',
             code: lambda.Code.fromAsset('../doraemo-web/doraemo-web-lambda/python', {
                 bundling: {
                     image: lambda.Runtime.PYTHON_3_12.bundlingImage,
@@ -35,17 +35,17 @@ export class DoraemoCrawler extends Construct {
                 }
             }),
             environment: {
-                CRAWLER_TABLE_NAME: this.table.tableName,
+                CONVERSATION_HISTORY_TABLE_NAME: this.table.tableName,
                 PROPS_NAME: props.name
             }
         });
         this.table.grantReadWriteData(this.handler);
 
         // Add this at the end of the constructor
-        new cdk.CfnOutput(this, 'CrawlerEndpoint', {
+        new cdk.CfnOutput(this, 'ChatEndpoint', {
             value: this.handler.functionArn,
             description: 'The ARN of the lambda function',
-            exportName: `${id}-CrawlerLambda`,
+            exportName: `${id}-ChatLambda`,
         });
     }
 }

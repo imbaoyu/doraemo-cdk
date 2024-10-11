@@ -5,7 +5,7 @@ import { Construct } from 'constructs';
 import { HitCounter } from "./hitcounter";
 import { TableViewer } from 'cdk-dynamo-table-viewer';
 import { DoraemoApiServer } from "./doraemo-api-server";
-import { DoraemoCrawler } from "./doraemo-crawler";
+import { DoraemoChatStack } from "./doraemo-chat-backend";
 import { CognitoUserPool } from './congito-user-pool';
 
 export class DoraemoCdkStack extends cdk.Stack {
@@ -50,8 +50,8 @@ export class DoraemoCdkStack extends cdk.Stack {
       cognitoUserPool.addAllowedUrl(`${apiServer.url}${endpoint}`);
     });
 
-    new DoraemoCrawler(this, 'DoraemoCrawler', {
-      name: 'DoraemoCrawler',
+    new DoraemoChatStack(this, 'DoraemoChatStack', {
+      name: 'DoraemoChatStack',
     });
   }
 }
