@@ -2,6 +2,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { Construct } from 'constructs';
 import * as cdk from 'aws-cdk-lib';
+import * as iam from 'aws-cdk-lib/aws-iam';
 
 export interface DoraemoChatProps {
     name: string;
@@ -39,7 +40,23 @@ export class DoraemoChatStack extends Construct {
                 PROPS_NAME: props.name
             }
         });
+
+        // Grant DynamoDB permissions
         this.table.grantReadWriteData(this.handler);
+
+        // Grant Bedrock permissions
+        // https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazonbedrock.html
+        this.handler.addToRolePolicy(new iam.PolicyStatement({
+            actions: [
+                'bedrock:InvokeModel',
+                'bedrock:InvokeModelWithResponseStream',
+                'bedrock:RetrieveAndGenerate',
+                'bedrock:InvokeAgent',
+                'bedrock:InvokeBuilder',
+                'bedrock:InvokeFlow'
+            ],
+            resources: ['*'], // You might want to restrict this to specific Bedrock model ARNs
+        }));
 
         // Add this at the end of the constructor
         new cdk.CfnOutput(this, 'ChatEndpoint', {
