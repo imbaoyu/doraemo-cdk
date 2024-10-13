@@ -37,21 +37,5 @@ export class DoraemoCdkStack extends cdk.Stack {
       name: 'MainUserPool',
       apiUrl: 'https://example.com'
     });
-
-    const apiServer: DoraemoApiServer = new DoraemoApiServer(this, 'DoramoApiServer', {
-      name: 'ApiServer',
-      userPool: cognitoUserPool.userPool,
-      userPoolClient: cognitoUserPool.userPoolClient,
-      cognitoUserPool: cognitoUserPool,
-    });
-
-    // Add all GET endpoints to allowed URLs
-    apiServer.getEndpoints.forEach(endpoint => {
-      cognitoUserPool.addAllowedUrl(`${apiServer.url}${endpoint}`);
-    });
-
-    new DoraemoChatStack(this, 'DoraemoChatStack', {
-      name: 'DoraemoChatStack',
-    });
   }
 }
