@@ -7,15 +7,17 @@ import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
 import { Duration } from 'aws-cdk-lib';
 
+// Usage: cconst existingBucket = s3.Bucket.fromBucketName(this, 'ImportedBucket', 'your-bucket-name');
+// new EmbeddingStack(app, 'EmbeddingStack', { bucket: existingBucket });
+export interface EmbeddingStackProps extends cdk.StackProps {
+  bucket: s3.IBucket;
+}
+
 export class EmbeddingStack extends cdk.Stack {
-  constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
+  constructor(scope: cdk.App, id: string, props: EmbeddingStackProps) {
     super(scope, id, props);
 
-    // Create an S3 bucket for file uploads
-    const bucket = new s3.Bucket(this, 'DocumentBucket', {
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
-    });
+    const bucket = props.bucket;
 
     // Create an SQS queue for processing events
     const queue = new sqs.Queue(this, 'EmbeddingQueue', {
