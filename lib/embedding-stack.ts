@@ -6,6 +6,7 @@ import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
 import { Duration } from 'aws-cdk-lib';
+import { Construct } from 'constructs';
 
 // Usage: const existingBucket = s3.Bucket.fromBucketName(this, 'ImportedBucket', 'your-bucket-name');
 // new EmbeddingStack(app, 'EmbeddingStack', { bucket: existingBucket });
@@ -14,7 +15,7 @@ export interface EmbeddingStackProps extends cdk.StackProps {
 }
 
 export class EmbeddingStack extends cdk.Stack {
-  constructor(scope: cdk.App, id: string, props: EmbeddingStackProps) {
+  constructor(scope: Construct, id: string, props: EmbeddingStackProps) {
     super(scope, id, props);
 
     const bucket = props.bucket;
