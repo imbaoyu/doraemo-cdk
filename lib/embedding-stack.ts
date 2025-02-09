@@ -7,7 +7,7 @@ import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
 import { Duration } from 'aws-cdk-lib';
 
-// Usage: cconst existingBucket = s3.Bucket.fromBucketName(this, 'ImportedBucket', 'your-bucket-name');
+// Usage: const existingBucket = s3.Bucket.fromBucketName(this, 'ImportedBucket', 'your-bucket-name');
 // new EmbeddingStack(app, 'EmbeddingStack', { bucket: existingBucket });
 export interface EmbeddingStackProps extends cdk.StackProps {
   bucket: s3.IBucket;
@@ -21,15 +21,23 @@ export class EmbeddingStack extends cdk.Stack {
 
     // Create an SQS queue for processing events
     const queue = new sqs.Queue(this, 'EmbeddingQueue', {
-      visibilityTimeout: Duration.seconds(300), // 5 minutes
+      visibilityTimeout: Duration.seconds(300),
       retentionPeriod: Duration.days(14),
     });
 
     // Create a Lambda function for processing files
     const processingLambda = new lambda.Function(this, 'EmbeddingProcessor', {
-      runtime: Runtime.PYTHON_3_9,
+      runtime: Runtime.PYTHON_3_12,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset('lambda/embedding-processor'),
+      code: lambda.Code.fromAsset('lambda/embedding-processor', {
+        bundling: {
+          image: Runtime.PYTHON_3_12.bundlingImage,
+          command: [
+            'bash', '-c',
+            'pip install -r requirements.txt -t /asset-output && cp -au . /asset-output'
+          ],
+        },
+      }),
       timeout: Duration.minutes(5),
       memorySize: 1024,
       environment: {

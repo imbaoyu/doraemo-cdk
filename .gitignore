@@ -7,3 +7,5 @@ node_modules
 .cdk.staging
 cdk.out
 !lambda/*.js
+.venv/
+lambda/embedding-processor/.venv/
