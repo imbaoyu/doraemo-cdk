@@ -3,8 +3,10 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
+import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
 import { Duration } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+import * as path from 'path';
 
 export interface EmbeddingConstructProps {
     bucket: s3.IBucket;
@@ -25,18 +27,16 @@ export class EmbeddingConstruct extends Construct {
             retentionPeriod: Duration.days(14),
         });
 
-        // Create a Lambda function for processing files
-        this.processingFunction = new lambda.Function(this, 'EmbeddingProcessor', {
-            runtime: lambda.Runtime.PYTHON_3_12,
-            handler: 'index.handler',
-            code: lambda.Code.fromAsset('lambda/embedding-processor', {
-                bundling: {
-                    image: lambda.Runtime.PYTHON_3_12.bundlingImage,
-                    command: [
-                        'bash', '-c',
-                        'pip install -r requirements.txt -t /asset-output && cp -au . /asset-output'
-                    ],
-                },
+        // Create Docker image asset
+        const dockerImageAsset = new ecr_assets.DockerImageAsset(this, 'EmbeddingProcessorImage', {
+            directory: path.join(__dirname, '../lambda/embedding-processor'),
+            platform: ecr_assets.Platform.LINUX_AMD64,
+        });
+
+        // Create a Lambda function using container image
+        this.processingFunction = new lambda.DockerImageFunction(this, 'EmbeddingProcessor', {
+            code: lambda.DockerImageCode.fromEcr(dockerImageAsset.repository, {
+                tag: dockerImageAsset.imageTag
             }),
             timeout: Duration.minutes(5),
             memorySize: 1024,
