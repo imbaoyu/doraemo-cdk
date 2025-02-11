@@ -36,10 +36,10 @@ export class EmbeddingConstruct extends Construct {
         // Create a Lambda function using container image
         this.processingFunction = new lambda.DockerImageFunction(this, 'EmbeddingProcessor', {
             code: lambda.DockerImageCode.fromEcr(dockerImageAsset.repository, {
-                tag: dockerImageAsset.imageTag
+                tagOrDigest: dockerImageAsset.imageTag
             }),
             timeout: Duration.minutes(5),
-            memorySize: 1024,
+            memorySize: 2048,
             environment: {
                 BUCKET_NAME: bucket.bucketName,
             },
