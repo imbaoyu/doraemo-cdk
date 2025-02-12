@@ -4,6 +4,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Duration } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as path from 'path';
@@ -44,6 +45,17 @@ export class EmbeddingConstruct extends Construct {
                 BUCKET_NAME: bucket.bucketName,
             },
         });
+
+        // Add Bedrock permissions
+        this.processingFunction.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: [
+                    'bedrock:InvokeModel',
+                    'bedrock:InvokeModelWithResponseStream'
+                ],
+                resources: ['*']
+            })
+        );
 
         // Grant the Lambda function permissions to read from S3
         bucket.grantRead(this.processingFunction);

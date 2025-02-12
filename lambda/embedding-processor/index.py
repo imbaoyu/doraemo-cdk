@@ -4,9 +4,15 @@ from PyPDF2 import PdfReader
 import os
 import io
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import BedrockEmbeddings
 from typing import List
 
 s3_client = boto3.client('s3')
+bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
+embeddings = BedrockEmbeddings(
+    client=bedrock_client,
+    model_id="meta.llama2-13b-v1"
+)
 
 def is_pdf(filename):
     return filename.lower().endswith('.pdf')
@@ -25,6 +31,9 @@ def create_chunks(text: str) -> List[str]:
         separators=["\n\n", "\n", " ", ""]
     )
     return text_splitter.split_text(text)
+
+def create_embeddings(chunks: List[str]) -> List[List[float]]:
+    return embeddings.embed_documents(chunks)
 
 def handler(event, context):   
     for record in event['Records']:
@@ -61,10 +70,14 @@ def handler(event, context):
                         
                         # Split text into chunks
                         chunks = create_chunks(text)
-                        
                         print(f"Created {len(chunks)} chunks from PDF {key}")
+                        
                         if chunks:
+                            # Create embeddings for all chunks
+                            chunk_embeddings = create_embeddings(chunks)
+                            print(f"Created embeddings for {len(chunk_embeddings)} chunks")
                             print(f"First chunk content: {chunks[0]}")
+                            print(f"First chunk embedding (first 5 dimensions): {chunk_embeddings[0][:5]}")
                         else:
                             print("No chunks were created (empty document)")
                     else:
