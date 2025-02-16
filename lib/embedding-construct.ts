@@ -57,8 +57,8 @@ export class EmbeddingConstruct extends Construct {
             })
         );
 
-        // Grant the Lambda function permissions to read from S3
-        bucket.grantRead(this.processingFunction);
+        // Grant the Lambda function permissions to read/write to S3 bucket
+        bucket.grantReadWrite(this.processingFunction);
 
         // Add S3 notification to SQS
         bucket.addEventNotification(

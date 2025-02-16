@@ -1,18 +1,25 @@
 import urllib.parse
 import boto3
 from PyPDF2 import PdfReader
-import os
 import io
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import BedrockEmbeddings
+from langchain_community.vectorstores import LanceDB
 from typing import List
 
 s3_client = boto3.client('s3')
 bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
 embeddings = BedrockEmbeddings(
     client=bedrock_client,
-    model_id="meta.llama2-13b-v1"
+    model_id="amazon.titan-embed-text-v2:0"
 )
+
+def get_user_id_from_key(key: str) -> str:
+    # Assuming path format: user-documents/{userId}/filename
+    parts = key.split('/')
+    if len(parts) >= 2:
+        return parts[1]
+    raise ValueError(f"Invalid document key format: {key}")
 
 def is_pdf(filename):
     return filename.lower().endswith('.pdf')
@@ -32,8 +39,41 @@ def create_chunks(text: str) -> List[str]:
     )
     return text_splitter.split_text(text)
 
-def create_embeddings(chunks: List[str]) -> List[List[float]]:
-    return embeddings.embed_documents(chunks)
+def store_document_embeddings(bucket: str, document_key: str, chunks: List[str]) -> None:
+    # Get user ID from the document key
+    user_id = get_user_id_from_key(document_key)
+    
+    # Connect to LanceDB in the user's directory
+    db = LanceDB.connect(f"s3://{bucket}/user-documents/{user_id}/embeddings")
+    
+    # Use a fixed table name for all documents of this user
+    table_name = "document_embeddings"
+    
+    # Create metadata for each chunk
+    metadatas = [{"source": document_key, "chunk_index": i} for i in range(len(chunks))]
+    
+    # Get or create the table
+    try:
+        # Try to get existing table
+        vectorstore = LanceDB(
+            connection=db,
+            table_name=table_name,
+            embedding=embeddings,
+        )
+        # Add to existing table
+        vectorstore.add_texts(texts=chunks, metadatas=metadatas)
+    except:
+        # If table doesn't exist, create new one
+        vectorstore = LanceDB.from_texts(
+            texts=chunks,
+            embedding=embeddings,
+            connection=db,
+            table_name=table_name,
+            metadatas=metadatas
+        )
+    
+    print(f"Stored {len(chunks)} embeddings for user {user_id} in table: {table_name}")
+    return vectorstore
 
 def handler(event, context):   
     for record in event['Records']:
@@ -73,11 +113,16 @@ def handler(event, context):
                         print(f"Created {len(chunks)} chunks from PDF {key}")
                         
                         if chunks:
-                            # Create embeddings for all chunks
-                            chunk_embeddings = create_embeddings(chunks)
-                            print(f"Created embeddings for {len(chunk_embeddings)} chunks")
+                            # Store document chunks with embeddings
+                            vectorstore = store_document_embeddings(bucket, key, chunks)
+                            
+                            # Demonstrate retrieval with the first chunk
+                            similar_chunks = vectorstore.similarity_search(
+                                chunks[0], 
+                                k=1
+                            )
                             print(f"First chunk content: {chunks[0]}")
-                            print(f"First chunk embedding (first 5 dimensions): {chunk_embeddings[0][:5]}")
+                            print(f"Retrieved similar chunk: {similar_chunks[0].page_content}")
                         else:
                             print("No chunks were created (empty document)")
                     else:

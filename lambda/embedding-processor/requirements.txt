@@ -3,3 +3,5 @@ langchain>=0.1.0
 langchain-text-splitters>=0.0.1
 langchain-community>=0.0.1
 PyPDF2>=3.0.0
+lancedb>=0.3.0
+pyarrow>=14.0.1
