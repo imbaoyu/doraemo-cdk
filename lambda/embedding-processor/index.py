@@ -1,10 +1,12 @@
 import urllib.parse
 import boto3
-from PyPDF2 import PdfReader
 import io
+import lancedb
+from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import BedrockEmbeddings
 from langchain_community.vectorstores import LanceDB
+
 from typing import List
 
 s3_client = boto3.client('s3')
@@ -43,8 +45,8 @@ def store_document_embeddings(bucket: str, document_key: str, chunks: List[str])
     # Get user ID from the document key
     user_id = get_user_id_from_key(document_key)
     
-    # Connect to LanceDB in the user's directory
-    db = LanceDB.connect(f"s3://{bucket}/user-documents/{user_id}/embeddings")
+    # Connect to LanceDB using the lancedb library directly
+    db = lancedb.connect(f"s3://{bucket}/user-documents/{user_id}/embeddings")
     
     # Use a fixed table name for all documents of this user
     table_name = "document_embeddings"
@@ -55,9 +57,9 @@ def store_document_embeddings(bucket: str, document_key: str, chunks: List[str])
     # Get or create the table
     try:
         # Try to get existing table
+        table = db.open_table(table_name)
         vectorstore = LanceDB(
-            connection=db,
-            table_name=table_name,
+            connection=table,  # Pass the table instead of connection
             embedding=embeddings,
         )
         # Add to existing table
@@ -67,7 +69,7 @@ def store_document_embeddings(bucket: str, document_key: str, chunks: List[str])
         vectorstore = LanceDB.from_texts(
             texts=chunks,
             embedding=embeddings,
-            connection=db,
+            connection=db,  # Pass the db connection for new table creation
             table_name=table_name,
             metadatas=metadatas
         )
