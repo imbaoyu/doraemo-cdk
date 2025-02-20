@@ -119,12 +119,12 @@ def handler(event, context):
                             vectorstore = store_document_embeddings(bucket, key, chunks)
                             
                             # Demonstrate retrieval with the first chunk
-                            similar_chunks = vectorstore.similarity_search(
-                                chunks[0], 
-                                k=1
-                            )
-                            print(f"First chunk content: {chunks[0]}")
-                            print(f"Retrieved similar chunk: {similar_chunks[0].page_content}")
+                            # similar_chunks = vectorstore.similarity_search(
+                            #     chunks[0], 
+                            #     k=1
+                            # )
+                            # print(f"First chunk content: {chunks[0]}")
+                            # print(f"Retrieved similar chunk: {similar_chunks[0].page_content}")
                         else:
                             print("No chunks were created (empty document)")
                     else:

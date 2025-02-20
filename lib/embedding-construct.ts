@@ -40,7 +40,7 @@ export class EmbeddingConstruct extends Construct {
                 tagOrDigest: dockerImageAsset.imageTag
             }),
             timeout: Duration.minutes(5),
-            memorySize: 2048,
+            memorySize: 4096,
             environment: {
                 BUCKET_NAME: bucket.bucketName,
             },
