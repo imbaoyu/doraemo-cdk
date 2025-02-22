@@ -120,8 +120,12 @@ def get_latest_chat_history_for_user(user_name: str, amount: int) -> List[Dict[s
         raise Exception("Failed to retrieve chat history")
 
 def handler(event: Dict[Any, Any], context: Any) -> Dict[str, Any]:
-    print(f"Received event: {json.dumps(event)}")
-    print(f"Within context: {json.dumps(context.__dict__)}")
+    # Log only the relevant parts of the event
+    print(f"Received event arguments: {json.dumps(event.get('arguments', {}))}")
+    print(f"Received event username: {event.get('identity', {}).get('username', 'anon')}")
+    print(f"Context function name: {context.function_name}")
+    print(f"Context function version: {context.function_version}")
+    print(f"Context memory limit: {context.memory_limit_in_mb}")
     
     try:
         # Parse arguments

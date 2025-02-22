@@ -52,7 +52,7 @@ export class ChatConstruct extends Construct {
                     'dynamodb:GetItem',
                     'dynamodb:Query'
                 ],
-                resources: ['*'] // You might want to restrict this to specific table ARN
+                resources: ['*'] // restrict this to specific table ARN
             })
         );
     }
