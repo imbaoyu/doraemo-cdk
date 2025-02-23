@@ -11,7 +11,7 @@ export class DoraemoCdkStack extends cdk.Stack {
     // Import existing bucket
     const bucket = s3.Bucket.fromBucketName(this, 
         'UserDocumentBucket', 
-        'amplify-d1r842ef96fa1l-ma-doraemowebamplifystorage-7izfszqdd3ed');
+        'amplify-d1r842ef96fa1l-ma-doraemowebamplifystorage-0jemj9g9wtye');
 
     // Initialize the embedding construct
     new EmbeddingConstruct(this, 'EmbeddingProcessor', {

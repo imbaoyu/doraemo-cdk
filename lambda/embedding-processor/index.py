@@ -94,6 +94,20 @@ def handler(event, context):
                 key = urllib.parse.unquote_plus(s3_record['s3']['object']['key'])
                 
                 try:
+                    # Check if file exists in S3 before processing
+                    try:
+                        s3_client.head_object(Bucket=bucket, Key=key)
+                    except s3_client.exceptions.ClientError as e:
+                        if e.response['Error']['Code'] == '404':
+                            print(f"File {key} no longer exists in S3, skipping processing")
+                            # Return successfully to delete message from SQS
+                            return {
+                                'statusCode': 200,
+                                'body': 'File no longer exists, message deleted from queue'
+                            }
+                        else:
+                            raise e
+
                     if not is_pdf(key):
                         raise Exception(f"File {key} is not a PDF file")
 
