@@ -88,7 +88,7 @@ export class EmbeddingConstruct extends Construct {
         const documentUploadTopic = sns.Topic.fromTopicArn(
             this,
             'DocumentUploadTopic',
-            `arn:aws:sns:us-east-1:${process.env.CDK_DEFAULT_ACCOUNT}:DoraemoCdkStack-DocumentUploadTopic`
+            `arn:aws:sns:us-east-1:${process.env.CDK_DEFAULT_ACCOUNT}:amplify-d1r842ef96fa1l-main-branch-b7be5fa781-function1351588B-8VEE8MZ44W9R-DocumentUploadTopic75300C01-fcOp7PJgbjjC`
         );
 
         // Subscribe the SQS queue to the SNS topic
