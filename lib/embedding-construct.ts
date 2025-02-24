@@ -6,7 +6,7 @@ import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
-import { Duration } from 'aws-cdk-lib';
+import { Duration, RemovalPolicy } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -17,11 +17,26 @@ export interface EmbeddingConstructProps {
 export class EmbeddingConstruct extends Construct {
     public readonly processingFunction: lambda.Function;
     public readonly processingQueue: sqs.Queue;
+    public readonly embeddingsBucket: s3.Bucket;
 
     constructor(scope: Construct, id: string, props: EmbeddingConstructProps) {
         super(scope, id);
 
         const bucket = props.bucket;
+
+        // Create a new S3 bucket for embeddings
+        this.embeddingsBucket = new s3.Bucket(this, 'EmbeddingsBucket', {
+            removalPolicy: RemovalPolicy.RETAIN,
+            encryption: s3.BucketEncryption.S3_MANAGED,
+            blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+            versioned: true,
+            lifecycleRules: [
+                {
+                    enabled: true,
+                    noncurrentVersionExpiration: Duration.days(30),
+                }
+            ]
+        });
 
         // Create SQS queue for buffering document processing
         this.processingQueue = new sqs.Queue(this, 'EmbeddingProcessingQueue', {
@@ -49,7 +64,8 @@ export class EmbeddingConstruct extends Construct {
             timeout: Duration.minutes(5),
             memorySize: 4096,
             environment: {
-                BUCKET_NAME: bucket.bucketName,
+                SOURCE_BUCKET_NAME: bucket.bucketName,
+                EMBEDDINGS_BUCKET_NAME: this.embeddingsBucket.bucketName,
             },
         });
 
@@ -64,7 +80,21 @@ export class EmbeddingConstruct extends Construct {
             })
         );
 
-        // Add explicit S3 permissions
+        // Add S3 permissions for source bucket (read-only)
+        this.processingFunction.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: [
+                    's3:GetObject',
+                    's3:HeadObject',
+                ],
+                resources: [
+                    bucket.bucketArn,
+                    `${bucket.bucketArn}/*`
+                ]
+            })
+        );
+
+        // Add S3 permissions for embeddings bucket (read-write)
         this.processingFunction.addToRolePolicy(
             new iam.PolicyStatement({
                 actions: [
@@ -75,14 +105,11 @@ export class EmbeddingConstruct extends Construct {
                     's3:ListBucket'
                 ],
                 resources: [
-                    bucket.bucketArn,
-                    `${bucket.bucketArn}/*`
+                    this.embeddingsBucket.bucketArn,
+                    `${this.embeddingsBucket.bucketArn}/*`
                 ]
             })
         );
-
-        // Grant the Lambda function permissions to read/write to S3 bucket
-        bucket.grantReadWrite(this.processingFunction);
 
         // Import the SNS topic from the Amplify stack
         const documentUploadTopic = sns.Topic.fromTopicArn(

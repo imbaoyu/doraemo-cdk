@@ -47,8 +47,14 @@ def store_document_embeddings(bucket: str, document_key: str, chunks: List[str])
     # Get user ID from the document key
     user_id = get_user_id_from_key(document_key)
     
+    # Get embeddings bucket name from environment
+    embeddings_bucket = os.environ.get('EMBEDDINGS_BUCKET_NAME')
+    if not embeddings_bucket:
+        raise ValueError("EMBEDDINGS_BUCKET_NAME environment variable not set")
+    
     # Connect to LanceDB using the lancedb library directly
-    db = lancedb.connect(f"s3://{bucket}/user-documents/{user_id}/embeddings")
+    # Store embeddings in a user-specific folder in the embeddings bucket
+    db = lancedb.connect(f"s3://{embeddings_bucket}/users/{user_id}/embeddings")
     
     # Use a fixed table name for all documents of this user
     table_name = "document_embeddings"
@@ -100,15 +106,15 @@ def handler(event, context):
                 print("No document path in message")
                 continue
                 
-            # Extract bucket name from the environment
-            bucket = os.environ.get('BUCKET_NAME')
-            if not bucket:
-                raise ValueError("BUCKET_NAME environment variable not set")
+            # Extract bucket names from the environment
+            source_bucket = os.environ.get('SOURCE_BUCKET_NAME')
+            if not source_bucket:
+                raise ValueError("SOURCE_BUCKET_NAME environment variable not set")
                 
             try:
                 # Check if file exists in S3 before processing
                 try:
-                    s3_client.head_object(Bucket=bucket, Key=document_path)
+                    s3_client.head_object(Bucket=source_bucket, Key=document_path)
                 except s3_client.exceptions.ClientError as e:
                     if e.response['Error']['Code'] == '404':
                         print(f"File {document_path} no longer exists in S3, skipping processing")
@@ -121,8 +127,8 @@ def handler(event, context):
                     continue
 
                 # Download the file to memory
-                print(f"Downloading file: {document_path} from bucket: {bucket}")
-                response = s3_client.get_object(Bucket=bucket, Key=document_path)
+                print(f"Downloading file: {document_path} from bucket: {source_bucket}")
+                response = s3_client.get_object(Bucket=source_bucket, Key=document_path)
                 file_content = response['Body'].read()
 
                 # Read PDF content
@@ -139,7 +145,7 @@ def handler(event, context):
                     
                     if chunks:
                         # Store document chunks with embeddings
-                        vectorstore = store_document_embeddings(bucket, document_path, chunks)
+                        vectorstore = store_document_embeddings(source_bucket, document_path, chunks)
                     else:
                         print("No chunks were created (empty document)")
                 else:
