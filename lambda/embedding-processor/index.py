@@ -1,6 +1,7 @@
 import urllib.parse
 import boto3
 import io
+import json
 import lancedb
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -8,6 +9,7 @@ from langchain_community.embeddings import BedrockEmbeddings
 from langchain_community.vectorstores import LanceDB
 
 from typing import List
+import os
 
 s3_client = boto3.client('s3')
 bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
@@ -77,73 +79,80 @@ def store_document_embeddings(bucket: str, document_key: str, chunks: List[str])
     print(f"Stored {len(chunks)} embeddings for user {user_id} in table: {table_name}")
     return vectorstore
 
-def handler(event, context):   
+def handler(event, context):
+    print(f"Received event: {json.dumps(event)}")
+    
     for record in event['Records']:
-        # Get the SQS message which contains the S3 event
-        if 'body' in record:
-            import json
-            s3_event = json.loads(record['body'])
-            records = s3_event.get('Records', [])
-        else:
-            records = [record]
-
-        for s3_record in records:
-            # Check if this is an ObjectCreated event
-            if 's3' in s3_record and s3_record.get('eventName', '').startswith('ObjectCreated'):
-                bucket = s3_record['s3']['bucket']['name']
-                key = urllib.parse.unquote_plus(s3_record['s3']['object']['key'])
+        # Parse the SQS message which contains the SNS message
+        try:
+            # Extract the SNS message from the SQS body
+            sqs_body = json.loads(record['body'])
+            sns_message = json.loads(sqs_body['Message'])
+            print(f"SNS message: {json.dumps(sns_message)}")
+            
+            # Only process DOCUMENT_UPLOADED events
+            if sns_message.get('eventType') != 'DOCUMENT_UPLOADED':
+                print(f"Skipping non-upload event: {sns_message.get('eventType')}")
+                continue
                 
+            document_path = sns_message.get('documentPath')
+            if not document_path:
+                print("No document path in message")
+                continue
+                
+            # Extract bucket name from the environment
+            bucket = os.environ.get('BUCKET_NAME')
+            if not bucket:
+                raise ValueError("BUCKET_NAME environment variable not set")
+                
+            try:
+                # Check if file exists in S3 before processing
                 try:
-                    # Check if file exists in S3 before processing
-                    try:
-                        s3_client.head_object(Bucket=bucket, Key=key)
-                    except s3_client.exceptions.ClientError as e:
-                        if e.response['Error']['Code'] == '404':
-                            print(f"File {key} no longer exists in S3, skipping processing")
-                            # Return successfully to delete message from SQS
-                            return {
-                                'statusCode': 200,
-                                'body': 'File no longer exists, message deleted from queue'
-                            }
-                        else:
-                            raise e
-
-                    if not is_pdf(key):
-                        raise Exception(f"File {key} is not a PDF file")
-
-                    # Download the file to memory
-                    print(f"Downloading file: {key} from bucket: {bucket}")
-                    response = s3_client.get_object(Bucket=bucket, Key=key)
-                    file_content = response['Body'].read()
-
-                    # Read PDF content
-                    pdf_file = io.BytesIO(file_content)
-                    pdf_reader = PdfReader(pdf_file)
-                    
-                    if len(pdf_reader.pages) > 0:
-                        # Extract text from all pages
-                        text = extract_text_from_pdf(pdf_reader)
-                        
-                        # Split text into chunks
-                        chunks = create_chunks(text)
-                        print(f"Created {len(chunks)} chunks from PDF {key}")
-                        
-                        if chunks:
-                            # Store document chunks with embeddings
-                            vectorstore = store_document_embeddings(bucket, key, chunks)
-                            
-                            # Demonstrate retrieval with the first chunk
-                            # similar_chunks = vectorstore.similarity_search(
-                            #     chunks[0], 
-                            #     k=1
-                            # )
-                            # print(f"First chunk content: {chunks[0]}")
-                            # print(f"Retrieved similar chunk: {similar_chunks[0].page_content}")
-                        else:
-                            print("No chunks were created (empty document)")
+                    s3_client.head_object(Bucket=bucket, Key=document_path)
+                except s3_client.exceptions.ClientError as e:
+                    if e.response['Error']['Code'] == '404':
+                        print(f"File {document_path} no longer exists in S3, skipping processing")
+                        continue  # Skip this message and move to next one
                     else:
-                        print(f"PDF {key} has no pages")
+                        raise e
+
+                if not is_pdf(document_path):
+                    print(f"File {document_path} is not a PDF file, skipping")
+                    continue
+
+                # Download the file to memory
+                print(f"Downloading file: {document_path} from bucket: {bucket}")
+                response = s3_client.get_object(Bucket=bucket, Key=document_path)
+                file_content = response['Body'].read()
+
+                # Read PDF content
+                pdf_file = io.BytesIO(file_content)
+                pdf_reader = PdfReader(pdf_file)
+                
+                if len(pdf_reader.pages) > 0:
+                    # Extract text from all pages
+                    text = extract_text_from_pdf(pdf_reader)
                     
-                except Exception as e:
-                    print(f"Error processing {key}: {e}")
-                    raise e
+                    # Split text into chunks
+                    chunks = create_chunks(text)
+                    print(f"Created {len(chunks)} chunks from PDF {document_path}")
+                    
+                    if chunks:
+                        # Store document chunks with embeddings
+                        vectorstore = store_document_embeddings(bucket, document_path, chunks)
+                    else:
+                        print("No chunks were created (empty document)")
+                else:
+                    print(f"PDF {document_path} has no pages")
+                
+            except Exception as e:
+                print(f"Error processing {document_path}: {e}")
+                # Let the message go to DLQ after max retries
+                raise e
+                
+        except json.JSONDecodeError as e:
+            print(f"Error parsing message: {e}")
+            continue  # Skip malformed messages
+        except Exception as e:
+            print(f"Error processing record: {e}")
+            raise e  # Let the message go to DLQ after max retries
