@@ -66,6 +66,7 @@ export class EmbeddingConstruct extends Construct {
             environment: {
                 SOURCE_BUCKET_NAME: bucket.bucketName,
                 EMBEDDINGS_BUCKET_NAME: this.embeddingsBucket.bucketName,
+                USER_DOCUMENT_TABLE_NAME: 'UserDocument-jku623bccfdvziracnh673rzwe-NONE'
             },
         });
 
@@ -77,6 +78,17 @@ export class EmbeddingConstruct extends Construct {
                     'bedrock:InvokeModelWithResponseStream'
                 ],
                 resources: ['*']
+            })
+        );
+
+        // Add DynamoDB permissions
+        this.processingFunction.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: [
+                    'dynamodb:GetItem',
+                    'dynamodb:UpdateItem',
+                ],
+                resources: ['arn:aws:dynamodb:us-east-1:*:table/UserDocument-jku623bccfdvziracnh673rzwe-NONE']
             })
         );
 

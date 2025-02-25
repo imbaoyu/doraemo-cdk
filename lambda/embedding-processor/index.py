@@ -7,16 +7,21 @@ from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import BedrockEmbeddings
 from langchain_community.vectorstores import LanceDB
+from datetime import datetime
 
 from typing import List
 import os
 
 s3_client = boto3.client('s3')
+dynamodb_client = boto3.client('dynamodb')
 bedrock_client = boto3.client('bedrock-runtime', region_name='us-east-1')
 embeddings = BedrockEmbeddings(
     client=bedrock_client,
     model_id="amazon.titan-embed-text-v2:0"
 )
+
+# Get the DynamoDB table name from environment or use a default for local testing
+USER_DOCUMENT_TABLE_NAME = os.environ.get('USER_DOCUMENT_TABLE_NAME', 'UserDocument-jku623bccfdvziracnh673rzwe-NONE')
 
 def get_user_id_from_key(key: str) -> str:
     # Assuming path format: user-documents/{userId}/filename
@@ -43,6 +48,31 @@ def create_chunks(text: str) -> List[str]:
     )
     return text_splitter.split_text(text)
 
+def update_document_status(document_key: str, status: str) -> None:
+    """Update the document status in DynamoDB"""
+    try:
+        # Update the document status in DynamoDB
+        response = dynamodb_client.update_item(
+            TableName=USER_DOCUMENT_TABLE_NAME,
+            Key={
+                'id': {'S': document_key}
+            },
+            UpdateExpression='SET #status = :status, updatedAt = :updatedAt',
+            ExpressionAttributeNames={
+                '#status': 'status'
+            },
+            ExpressionAttributeValues={
+                ':status': {'S': status},
+                ':updatedAt': {'S': datetime.now().isoformat()}
+            },
+            ReturnValues='UPDATED_NEW'
+        )
+        print(f"Updated document status to '{status}' for {document_key}: {response}")
+        return response
+    except Exception as e:
+        print(f"Error updating document status: {e}")
+        raise e
+
 def store_document_embeddings(bucket: str, document_key: str, chunks: List[str]) -> None:
     # Get user ID from the document key
     user_id = get_user_id_from_key(document_key)
@@ -54,7 +84,7 @@ def store_document_embeddings(bucket: str, document_key: str, chunks: List[str])
     
     # Connect to LanceDB using the lancedb library directly
     # Store embeddings in a user-specific folder in the embeddings bucket
-    db = lancedb.connect(f"s3://{embeddings_bucket}/users/{user_id}/embeddings")
+    db = lancedb.connect(f"s3://{embeddings_bucket}/embeddings/{user_id}")
     
     # Use a fixed table name for all documents of this user
     table_name = "document_embeddings"
@@ -124,6 +154,8 @@ def handler(event, context):
 
                 if not is_pdf(document_path):
                     print(f"File {document_path} is not a PDF file, skipping")
+                    # Update status to 'error' for non-PDF files
+                    update_document_status(document_path, 'error')
                     continue
 
                 # Download the file to memory
@@ -146,13 +178,25 @@ def handler(event, context):
                     if chunks:
                         # Store document chunks with embeddings
                         vectorstore = store_document_embeddings(source_bucket, document_path, chunks)
+                        
+                        # Update document status to 'processed'
+                        update_document_status(document_path, 'processed')
                     else:
                         print("No chunks were created (empty document)")
+                        # Update status to 'error' for empty documents
+                        update_document_status(document_path, 'error')
                 else:
                     print(f"PDF {document_path} has no pages")
+                    # Update status to 'error' for empty PDFs
+                    update_document_status(document_path, 'error')
                 
             except Exception as e:
                 print(f"Error processing {document_path}: {e}")
+                # Update status to 'error' on exception
+                try:
+                    update_document_status(document_path, 'error')
+                except Exception as update_error:
+                    print(f"Failed to update document status: {update_error}")
                 # Let the message go to DLQ after max retries
                 raise e
                 
