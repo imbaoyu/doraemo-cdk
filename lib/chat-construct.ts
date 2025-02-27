@@ -23,6 +23,7 @@ export class ChatConstruct extends Construct {
 
         // Create a Lambda function using container image
         this.processingFunction = new lambda.DockerImageFunction(this, 'ChatProcessor', {
+            functionName: 'DoraemoCdkStack-ChatProcessor',
             code: lambda.DockerImageCode.fromEcr(dockerImageAsset.repository, {
                 tagOrDigest: dockerImageAsset.imageTag
             }),
