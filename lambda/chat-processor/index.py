@@ -121,7 +121,7 @@ def get_latest_chat_history_for_user(user_name: str, amount: int) -> List[Dict[s
 
 def handler(event: Dict[Any, Any], context: Any) -> Dict[str, Any]:
     print(f"Received event: {json.dumps(event)}")
-    print(f"Within context: {json.dumps(context.__dict__)}")
+    print(f"Function: {context.function_name}, RequestId: {context.aws_request_id}")
     
     try:
         # Parse arguments
