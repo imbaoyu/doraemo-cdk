@@ -116,7 +116,7 @@ def store_document_embeddings(bucket: str, document_key: str, chunks: List[str])
     return vectorstore
 
 def handler(event, context):
-    print(f"Received event: {json.dumps(event)}")
+    print(f"Function: {context.function_name}, RequestId: {context.aws_request_id}")
     
     for record in event['Records']:
         # Parse the SQS message which contains the SNS message
