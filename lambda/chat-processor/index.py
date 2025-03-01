@@ -70,7 +70,7 @@ Your purpose is to be a thoughtful companion who helps the human explore ideas, 
 def chat_with_bedrock(aggregated_messages: List[Dict[str, Any]]) -> str:
     try:
         params = {
-            "modelId": MODEL_ID,
+            "modelId": INFERENCE_PROFILE_ID,
             "messages": aggregated_messages,
             "inferenceConfig": {
                 "maxTokens": 1000,
@@ -82,10 +82,6 @@ def chat_with_bedrock(aggregated_messages: List[Dict[str, Any]]) -> str:
                 "text": SYSTEM_PROMPT
             }]
         }
-        
-        # Add inference profile ID if it exists
-        if INFERENCE_PROFILE_ID:
-            params["inferenceProfileId"] = INFERENCE_PROFILE_ID
         
         response = bedrock.converse(**params)
         return response['output']['message']['content'][0]['text']
