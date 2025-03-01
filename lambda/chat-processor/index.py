@@ -7,7 +7,8 @@ from datetime import datetime
 
 # Constants
 CHAT_HISTORY_TABLE_NAME = os.environ.get('CHAT_HISTORY_TABLE_NAME', 'chat-history-table')
-MODEL_ID = 'us.anthropic.claude-3-5-sonnet-20241022-v2:0'
+MODEL_ID = 'anthropic.claude-3-5-sonnet-20241022-v2:0'
+INFERENCE_PROFILE_ID = 'us.anthropic.claude-3-5-sonnet-20241022-v2:0'
 REGION = 'us-east-1'
 SLIDING_WINDOW_SIZE = 10
 
@@ -72,7 +73,7 @@ def chat_with_bedrock(aggregated_messages: List[Dict[str, Any]]) -> str:
             "modelId": MODEL_ID,
             "messages": aggregated_messages,
             "inferenceConfig": {
-                "maxTokens": 500,
+                "maxTokens": 1000,
                 "stopSequences": ["human:", "assistant:", "user:"],
                 "temperature": 1,
                 "topP": 0.8,
@@ -81,6 +82,10 @@ def chat_with_bedrock(aggregated_messages: List[Dict[str, Any]]) -> str:
                 "text": SYSTEM_PROMPT
             }]
         }
+        
+        # Add inference profile ID if it exists
+        if INFERENCE_PROFILE_ID:
+            params["inferenceProfileId"] = INFERENCE_PROFILE_ID
         
         response = bedrock.converse(**params)
         return response['output']['message']['content'][0]['text']
