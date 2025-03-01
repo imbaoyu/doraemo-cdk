@@ -7,7 +7,7 @@ from datetime import datetime
 
 # Constants
 CHAT_HISTORY_TABLE_NAME = os.environ.get('CHAT_HISTORY_TABLE_NAME', 'chat-history-table')
-MODEL_ID = 'anthropic.claude-3-5-sonnet-20241022-v2:0'
+MODEL_ID = 'us.anthropic.claude-3-5-sonnet-20241022-v2:0'
 REGION = 'us-east-1'
 SLIDING_WINDOW_SIZE = 10
 
