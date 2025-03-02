@@ -28,8 +28,8 @@ export class ChatConstruct extends Construct {
             code: lambda.DockerImageCode.fromEcr(dockerImageAsset.repository, {
                 tagOrDigest: dockerImageAsset.imageTag
             }),
-            timeout: Duration.minutes(5),
-            memorySize: 1024,
+            timeout: Duration.minutes(15),
+            memorySize: 2048,
             environment: {
                 CHAT_HISTORY_TABLE_NAME: props.chatHistoryTableName,
                 S3_BUCKET_NAME: props.embedingsBucketName || 'doraemo-embeddings',

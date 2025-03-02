@@ -261,30 +261,59 @@ def handler(event: Dict[Any, Any], context: Any) -> Dict[str, Any]:
         user_id = event.get('identity', {}).get('claims', {}).get('sub', 'anonId')
         prompt_text = args.get('prompt')
         
+        print(f"Processing request for user: {user_name}, user_id: {user_id}")
+        print(f"Prompt: {prompt_text}")
+        
         if not prompt_text:
             raise Exception('No prompt provided')
         
         # Search embeddings using LanceDB with direct S3 connection
+        print("Step 1: Connecting to LanceDB...")
         db = connect_to_lancedb(user_id)
+        if db:
+            print("Successfully connected to LanceDB")
+        else:
+            print("WARNING: Failed to connect to LanceDB, proceeding without embeddings")
+        
+        print("Step 2: Generating query embedding...")
         query_embedding = get_query_embedding(prompt_text)
-        search_results = search_with_lancedb(db, query_embedding) if db else []
+        if query_embedding and len(query_embedding) > 0:
+            print(f"Successfully generated embedding of dimension {len(query_embedding)}")
+        else:
+            print("WARNING: Failed to generate query embedding")
+        
+        print("Step 3: Searching for relevant documents...")
+        search_results = search_with_lancedb(db, query_embedding) if db and query_embedding else []
+        print(f"Found {len(search_results)} relevant documents")
+        
+        print("Step 4: Formatting context from search results...")
         context_text = format_context_from_results(search_results)
+        context_length = len(context_text.split())
+        print(f"Generated context with {context_length} words")
         
         # Enrich prompt with context if available
         enriched_prompt = prompt_text
         if context_text:
+            print("Step 5: Enriching prompt with context...")
             enriched_prompt = f"{prompt_text}\n\nHere's relevant information I found:\n{context_text}"
+            print("Prompt successfully enriched with context")
+        else:
+            print("No context available to enrich prompt")
             
         # Get chat history
+        print("Step 6: Retrieving chat history...")
         chat_history = get_latest_chat_history_for_user(user_name, SLIDING_WINDOW_SIZE)
+        print(f"Retrieved {len(chat_history)} chat history entries")
         aggregated_messages = []
         
         # Build message history
+        print("Step 7: Building message history...")
         for record in chat_history:
             aggregated_messages.extend([
                 {"role": "user", "content": [{"text": record['prompt']['S']}]},
                 {"role": "assistant", "content": [{"text": record['response']['S']}]}
             ])
+        print(f"Built message history with {len(aggregated_messages)} messages")
             
         # Add current prompt with context
         aggregated_messages.append({
@@ -293,18 +322,27 @@ def handler(event: Dict[Any, Any], context: Any) -> Dict[str, Any]:
         })
         
         # Get response from Bedrock
+        print("Step 8: Calling Bedrock for response...")
         response_text = chat_with_bedrock(aggregated_messages)
-        if not response_text:
+        if response_text:
+            print(f"Received response from Bedrock ({len(response_text)} characters)")
+        else:
+            print("ERROR: No response received from Bedrock")
             raise Exception('Failed to get response')
             
         # Update history with original prompt (not the enriched one)
+        print("Step 9: Updating chat history...")
         update_chat_history(user_id, user_name, prompt_text, response_text, True)
+        print("Chat history updated successfully")
         
         # Return response with search metadata
-        return {
+        print("Step 10: Preparing final response...")
+        final_response = {
             "response": response_text,
             "searchResults": search_results if search_results else []
         }
+        print("Handler completed successfully")
+        return final_response
         
     except Exception as e:
         print(f"Error: {str(e)}")
