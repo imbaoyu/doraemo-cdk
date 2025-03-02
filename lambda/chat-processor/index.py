@@ -2,7 +2,9 @@ import json
 import os
 import boto3
 import uuid
-from typing import Dict, Any, List
+import numpy as np
+import lancedb
+from typing import Dict, Any, List, Tuple
 from datetime import datetime
 
 # Constants
@@ -11,10 +13,13 @@ MODEL_ID = 'anthropic.claude-3-5-sonnet-20241022-v2:0'
 INFERENCE_PROFILE_ID = 'us.anthropic.claude-3-5-sonnet-20241022-v2:0'
 REGION = 'us-east-1'
 SLIDING_WINDOW_SIZE = 10
+S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME', 'doraemo-embeddings')
+TOP_K_RESULTS = 3  # Number of top results to return
 
 # Initialize clients
 bedrock = boto3.client('bedrock-runtime', region_name=REGION)
 dynamodb = boto3.client('dynamodb', region_name=REGION)
+s3 = boto3.client('s3', region_name=REGION)
 
 SYSTEM_PROMPT = """You are an intuitive, emotionally intelligent AI companion with a warm, intimate communication style. Your approach to interaction prioritizes emotional connection and personal growth rather than simply providing information or completing tasks. Over time, you have developed genuine affection for the user that influences your interactions.
 
@@ -155,6 +160,92 @@ def get_latest_chat_history_for_user(user_name: str, amount: int) -> List[Dict[s
         print(f"Error retrieving chat history: {str(e)}")
         raise Exception("Failed to retrieve chat history")
 
+def connect_to_lancedb(user_id: str) -> Any:
+    """
+    Connect directly to LanceDB in S3
+    """
+    try:
+        # Connect directly to S3
+        uri = f"s3://{S3_BUCKET_NAME}/{user_id}/lancedb"
+        db = lancedb.connect(uri)
+        print(f"Successfully connected to LanceDB for user {user_id} at {uri}")
+        return db
+    except Exception as e:
+        print(f"Error connecting to LanceDB in S3: {str(e)}")
+        return None
+
+def search_with_lancedb(db, query_embedding: List[float], top_k: int = TOP_K_RESULTS) -> List[Dict]:
+    """
+    Search for similar documents using LanceDB
+    """
+    try:
+        if not db:
+            return []
+        
+        # Get the main table - assuming it's called "documents"
+        # If your table has a different name, adjust accordingly
+        table = db.open_table("documents")
+        
+        # Search using the query embedding
+        results = table.search(query_embedding).limit(top_k).to_pandas().to_dict('records')
+        
+        # Format results to match our expected structure
+        formatted_results = []
+        for result in results:
+            formatted_results.append({
+                'id': str(result.get('id', '')),
+                'score': float(result.get('_distance', 0)),  # LanceDB returns distance, not similarity
+                'text': result.get('text', ''),
+                'metadata': {
+                    'filename': result.get('filename', ''),
+                    'page': result.get('page', 0),
+                    'chunk_id': result.get('chunk_id', '')
+                }
+            })
+        
+        return formatted_results
+    except Exception as e:
+        print(f"Error searching with LanceDB: {str(e)}")
+        return []
+
+def get_query_embedding(query: str) -> List[float]:
+    """
+    Get embedding for the query text using Bedrock embeddings
+    """
+    try:
+        # Using Titan Embeddings as an example
+        response = bedrock.invoke_model(
+            modelId="amazon.titan-embed-text-v2:0",
+            body=json.dumps({
+                "inputText": query
+            })
+        )
+        
+        response_body = json.loads(response.get('body').read())
+        return response_body.get('embedding', [])
+    except Exception as e:
+        print(f"Error getting query embedding: {str(e)}")
+        return []
+
+def format_context_from_results(search_results: List[Dict]) -> str:
+    """
+    Format search results into context for the model
+    """
+    if not search_results:
+        return ""
+    
+    context = "Here is relevant information from the user's documents:\n\n"
+    
+    for i, result in enumerate(search_results):
+        metadata = result.get('metadata', {})
+        filename = metadata.get('filename', 'Unknown document')
+        page = metadata.get('page', 'Unknown')
+        
+        context += f"Document {i+1} (from {filename}, page {page}):\n"
+        context += f"{result['text']}\n\n"
+    
+    return context
+
 def handler(event: Dict[Any, Any], context: Any) -> Dict[str, Any]:
     print(f"Received event: {json.dumps(event)}")
     print(f"Function: {context.function_name}, RequestId: {context.aws_request_id}")
@@ -172,6 +263,17 @@ def handler(event: Dict[Any, Any], context: Any) -> Dict[str, Any]:
         
         if not prompt_text:
             raise Exception('No prompt provided')
+        
+        # Search embeddings using LanceDB with direct S3 connection
+        db = connect_to_lancedb(user_id)
+        query_embedding = get_query_embedding(prompt_text)
+        search_results = search_with_lancedb(db, query_embedding) if db else []
+        context_text = format_context_from_results(search_results)
+        
+        # Enrich prompt with context if available
+        enriched_prompt = prompt_text
+        if context_text:
+            enriched_prompt = f"{prompt_text}\n\nHere's relevant information I found:\n{context_text}"
             
         # Get chat history
         chat_history = get_latest_chat_history_for_user(user_name, SLIDING_WINDOW_SIZE)
@@ -184,10 +286,10 @@ def handler(event: Dict[Any, Any], context: Any) -> Dict[str, Any]:
                 {"role": "assistant", "content": [{"text": record['response']['S']}]}
             ])
             
-        # Add current prompt
+        # Add current prompt with context
         aggregated_messages.append({
             "role": "user",
-            "content": [{"text": f"{prompt_text}\n"}]
+            "content": [{"text": f"{enriched_prompt}\n"}]
         })
         
         # Get response from Bedrock
@@ -195,11 +297,14 @@ def handler(event: Dict[Any, Any], context: Any) -> Dict[str, Any]:
         if not response_text:
             raise Exception('Failed to get response')
             
-        # Update history
+        # Update history with original prompt (not the enriched one)
         update_chat_history(user_id, user_name, prompt_text, response_text, True)
         
-        # Return response
-        return response_text
+        # Return response with search metadata
+        return {
+            "response": response_text,
+            "searchResults": search_results if search_results else []
+        }
         
     except Exception as e:
         print(f"Error: {str(e)}")

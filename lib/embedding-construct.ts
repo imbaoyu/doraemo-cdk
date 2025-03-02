@@ -11,7 +11,7 @@ import { Construct } from 'constructs';
 import * as path from 'path';
 
 export interface EmbeddingConstructProps {
-    bucket: s3.IBucket;
+    sourceDocumentsBucket: s3.IBucket;
 }
 
 export class EmbeddingConstruct extends Construct {
@@ -22,7 +22,7 @@ export class EmbeddingConstruct extends Construct {
     constructor(scope: Construct, id: string, props: EmbeddingConstructProps) {
         super(scope, id);
 
-        const bucket = props.bucket;
+        const sourceDocumentsBucket = props.sourceDocumentsBucket;
 
         // Create a new S3 bucket for embeddings
         this.embeddingsBucket = new s3.Bucket(this, 'EmbeddingsBucket', {
@@ -64,7 +64,7 @@ export class EmbeddingConstruct extends Construct {
             timeout: Duration.minutes(5),
             memorySize: 4096,
             environment: {
-                SOURCE_BUCKET_NAME: bucket.bucketName,
+                SOURCE_BUCKET_NAME: sourceDocumentsBucket.bucketName,
                 EMBEDDINGS_BUCKET_NAME: this.embeddingsBucket.bucketName,
                 USER_DOCUMENT_TABLE_NAME: 'UserDocument-jku623bccfdvziracnh673rzwe-NONE'
             },
@@ -100,8 +100,8 @@ export class EmbeddingConstruct extends Construct {
                     's3:HeadObject',
                 ],
                 resources: [
-                    bucket.bucketArn,
-                    `${bucket.bucketArn}/*`
+                    sourceDocumentsBucket.bucketArn,
+                    `${sourceDocumentsBucket.bucketArn}/*`
                 ]
             })
         );

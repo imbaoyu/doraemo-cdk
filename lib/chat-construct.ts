@@ -7,6 +7,7 @@ import * as path from 'path';
 
 export interface ChatConstructProps {
     chatHistoryTableName: string;
+    embedingsBucketName?: string; // Optional bucket name for embeddings
 }
 
 export class ChatConstruct extends Construct {
@@ -31,6 +32,7 @@ export class ChatConstruct extends Construct {
             memorySize: 1024,
             environment: {
                 CHAT_HISTORY_TABLE_NAME: props.chatHistoryTableName,
+                S3_BUCKET_NAME: props.embedingsBucketName || 'doraemo-embeddings',
             },
         });
 
@@ -54,6 +56,24 @@ export class ChatConstruct extends Construct {
                     'dynamodb:Query'
                 ],
                 resources: ['*'] // restrict this to specific table ARN
+            })
+        );
+        
+        // Add S3 permissions for LanceDB operations
+        this.processingFunction.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: [
+                    's3:GetObject',
+                    's3:PutObject',
+                    's3:ListBucket',
+                    's3:GetBucketLocation',
+                    's3:ListMultipartUploadParts',
+                    's3:AbortMultipartUpload',
+                ],
+                resources: [
+                    `arn:aws:s3:::${props.embedingsBucketName || 'doraemo-embeddings'}`,
+                    `arn:aws:s3:::${props.embedingsBucketName || 'doraemo-embeddings'}/*`
+                ]
             })
         );
     }

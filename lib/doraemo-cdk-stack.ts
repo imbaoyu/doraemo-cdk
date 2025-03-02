@@ -9,18 +9,19 @@ export class DoraemoCdkStack extends cdk.Stack {
     super(scope, id, props);
 
     // Import existing bucket
-    const bucket = s3.Bucket.fromBucketName(this, 
+    const userDocumentBucket = s3.Bucket.fromBucketName(this, 
         'UserDocumentBucket', 
         'amplify-d1r842ef96fa1l-ma-doraemowebamplifystorage-0jemj9g9wtye');
 
     // Initialize the embedding construct
-    new EmbeddingConstruct(this, 'EmbeddingProcessor', {
-      bucket: bucket
+    const embeddingConstruct = new EmbeddingConstruct(this, 'EmbeddingProcessor', {
+      sourceDocumentsBucket: userDocumentBucket
     });
 
     // Initialize the chat construct
     new ChatConstruct(this, 'ChatProcessor', {
-      chatHistoryTableName: 'ChatHistory-jku623bccfdvziracnh673rzwe-NONE'
+      chatHistoryTableName: 'ChatHistory-jku623bccfdvziracnh673rzwe-NONE',
+      embedingsBucketName: embeddingConstruct.embeddingsBucket.bucketName
     });
   }
 }
