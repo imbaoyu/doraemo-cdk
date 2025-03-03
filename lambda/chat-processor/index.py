@@ -166,7 +166,7 @@ def connect_to_lancedb(user_id: str) -> Any:
     """
     try:
         # Connect directly to S3
-        uri = f"s3://{S3_BUCKET_NAME}/{user_id}/lancedb"
+        uri = f"s3://{S3_BUCKET_NAME}/embeddings/{user_id}"
         db = lancedb.connect(uri)
         print(f"Successfully connected to LanceDB for user {user_id} at {uri}")
         return db
@@ -181,10 +181,8 @@ def search_with_lancedb(db, query_embedding: List[float], top_k: int = TOP_K_RES
     try:
         if not db:
             return []
-        
-        # Get the main table - assuming it's called "documents"
-        # If your table has a different name, adjust accordingly
-        table = db.open_table("documents")
+            
+        table = db.open_table("document_embeddings")
         
         # Search using the query embedding
         results = table.search(query_embedding).limit(top_k).to_pandas().to_dict('records')
@@ -234,7 +232,7 @@ def format_context_from_results(search_results: List[Dict]) -> str:
     if not search_results:
         return ""
     
-    context = "Here is relevant information from the user's documents:\n\n"
+    context = ""
     
     for i, result in enumerate(search_results):
         metadata = result.get('metadata', {})
@@ -295,7 +293,7 @@ def handler(event: Dict[Any, Any], context: Any) -> Dict[str, Any]:
         enriched_prompt = prompt_text
         if context_text:
             print("Step 5: Enriching prompt with context...")
-            enriched_prompt = f"{prompt_text}\n\nHere's relevant information I found:\n{context_text}"
+            enriched_prompt = f"{prompt_text}\n\nHere's relevant information from your documents:\n{context_text}"
             print("Prompt successfully enriched with context")
         else:
             print("No context available to enrich prompt")
