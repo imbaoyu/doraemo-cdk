@@ -133,8 +133,8 @@ def update_chat_history(user_id: str, user_name: str, prompt_text: str, response
                 'response': {'S': cleaned_response},
                 'thread': {'S': thread_id},
                 'owner': {'S': user_id},
-                'createdAt': {'S': datetime.utcnow().isoformat()},
-                'updatedAt': {'S': datetime.utcnow().isoformat()}
+                'createdAt': {'S': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'},
+                'updatedAt': {'S': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'}
             }
         }
         dynamodb.put_item(**put_params)
